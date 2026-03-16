@@ -7,7 +7,17 @@ const COLS = 10;
 
 // The same mappings from the backend for visual representation
 const SNAKES = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
-const LADDERS = { 1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100 };
+const LADDERS = {
+  11: 30, 
+  15: 44, 
+  26: 67, 
+  34: 47, 
+  52: 74, 
+  58: 83, 
+  64: 84, 
+  76: 95, 
+  80: 98 
+};
 
 export default function Board({ players }) {
   // Generate the board grid based on standard Snake & Ladder layout
@@ -34,6 +44,7 @@ export default function Board({ players }) {
   const getSquarePos = (num) => {
     const bottomRow = Math.floor((num - 1) / 10);
     const topRow = 9 - bottomRow;
+    // Row 0 (1-10) goes left to right, Row 1 (11-20) goes right to left...
     const isMovingRight = bottomRow % 2 === 0;
     const colOffset = (num - 1) % 10;
     const col = isMovingRight ? colOffset : 9 - colOffset;
@@ -211,13 +222,18 @@ export default function Board({ players }) {
         </svg>
 
         {squares.map(num => {
-          const isLaddersStart = LADDERS[num];
-          const isSnakesStart = SNAKES[num];
-          
+          // Use the EXACT SAME LOGIC as getSquarePos to assign grid area!
+          const bottomRow = Math.floor((num - 1) / 10);
+          const topRow = 9 - bottomRow;
+          const isMovingRight = bottomRow % 2 === 0;
+          const colOffset = (num - 1) % 10;
+          const col = isMovingRight ? colOffset : 9 - colOffset;
+
           return (
             <div 
               key={num} 
               className={`square ${num % 2 === 0 ? 'even' : 'odd'}`}
+              style={{ gridRow: topRow + 1, gridColumn: col + 1 }}
             >
               <span className="square-num">{num}</span>
             </div>

@@ -17,15 +17,15 @@ const SNAKES = {
 
 // Mapping of starting square to ending square for ladders
 const LADDERS = {
-  1: 38,
-  4: 14,
-  9: 31,
-  21: 42,
-  28: 84,
-  36: 44,
-  51: 67,
-  71: 91,
-  80: 100
+  11: 30, // Reference: Bottom left ladder
+  15: 44, // Reference: Bottom right ladder
+  26: 67, // Reference: Middle ladder
+  34: 47, // Reference: Middle ladder
+  52: 74, // Reference: Middle ladder
+  58: 83, // Reference: Upper right ladder
+  64: 84, // Reference: Upper middle ladder
+  76: 95, // Reference: Top ladder
+  80: 98  // Reference: Top ladder
 };
 
 // Function to calculate final position after accounting for snakes and ladders

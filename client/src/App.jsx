@@ -152,18 +152,42 @@ function App() {
   // Helper bindings
   const playersInRoom = Object.values(gameState.players);
   const isMyTurn = gameState.status === 'playing' && gameState.playerOrder[gameState.turnIndex] === socket.id;
-  const winnerPlayer = gameState.winner ? gameState.players[gameState.winner] : null;
+  
+  // Find the winning player if the game is over
+  const winnerPlayer = gameState.status === 'finished' 
+    ? Object.values(gameState.players).find(p => p.position >= 100) 
+    : null;
+
+  const getStatusMessage = () => {
+    if (gameState.status === 'waiting') {
+      return 'Waiting for players...';
+    } else if (gameState.status === 'playing') {
+      return 'Game In Progress';
+    } else if (gameState.status === 'finished') {
+      return 'Game Over!';
+    }
+    return '';
+  };
+
+  const handleExitGame = () => {
+    if (confirm("Are you sure you want to leave the game?")) {
+      socket.emit('leave-room');
+      setGameState(null);
+      setCurrentRoomId('');
+    }
+  };
 
   return (
     <div className="game-container">
       
       {/* Left Sidebar: Status, Players, Dice */}
-      <div className="sidebar glass status-panel">
+      <div className="sidebar panel glass">
         <div>
           <h2>Room: {currentRoomId}</h2>
           
-          <div className="status-badge" style={{ marginBottom: '20px', color: gameState.status === 'playing' ? '#10b981' : '#f59e0b' }}>
-            Status: {gameState.status === 'waiting' ? 'Waiting for players...' : 'Game In Progress'}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <p className="status-text" style={{ color: gameState.status === 'playing' ? '#10b981' : '#f59e0b' }}>{getStatusMessage()}</p>
+            <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.9rem', backgroundColor: '#ef4444', border: 'none' }} onClick={handleExitGame}>Exit</button>
           </div>
 
           {gameState.status === 'waiting' && playersInRoom.length >= 2 && (
