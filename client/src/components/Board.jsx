@@ -21,19 +21,10 @@ const LADDERS = {
 
 export default function Board({ players }) {
   // Generate the board grid based on standard Snake & Ladder layout
-  // Bottom-left is 1, moving right. Next row moves left, etc.
   const getSquares = () => {
     const squares = [];
-    for (let r = ROWS - 1; r >= 0; r--) {
-      // Determine direction for this row (0-indexed bottom row r=9 moves right)
-      const movingRight = (ROWS - 1 - r) % 2 === 0;
-      
-      const rowSquares = [];
-      for (let c = 0; c < COLS; c++) {
-        const num = (r * COLS) + (movingRight ? c + 1 : COLS - c);
-        rowSquares.push(num);
-      }
-      squares.push(...rowSquares); // Flatten directly
+    for (let i = 1; i <= 100; i++) {
+        squares.push(i);
     }
     return squares;
   };
