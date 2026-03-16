@@ -6,17 +6,25 @@ const ROWS = 10;
 const COLS = 10;
 
 // The same mappings from the backend for visual representation
-const SNAKES = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
+const SNAKES = {
+  32: 10,
+  34: 6,
+  48: 26,
+  62: 18,
+  88: 24,
+  95: 56,
+  97: 78
+};
+
 const LADDERS = {
-  11: 30, 
-  15: 44, 
-  26: 67, 
-  34: 47, 
-  52: 74, 
-  58: 83, 
-  64: 84, 
-  76: 95, 
-  80: 98 
+  1: 38,
+  4: 14,
+  8: 30,
+  21: 42,
+  28: 76,
+  50: 67,
+  71: 92,
+  80: 99
 };
 
 export default function Board({ players }) {
@@ -220,13 +228,18 @@ export default function Board({ players }) {
           const colOffset = (num - 1) % 10;
           const col = isMovingRight ? colOffset : 9 - colOffset;
 
+          // Classic vibrant colors for the board
+          const classicColors = ['#facc15', '#ef4444', '#3b82f6', '#22c55e', '#f97316'];
+          // Use a pseudo-random looking pattern that is static by using math on the index
+          const bgColor = classicColors[(num + Math.floor(num/10)*2) % classicColors.length];
+
           return (
             <div 
               key={num} 
-              className={`square ${num % 2 === 0 ? 'even' : 'odd'}`}
-              style={{ gridRow: topRow + 1, gridColumn: col + 1 }}
+              className="square"
+              style={{ gridRow: topRow + 1, gridColumn: col + 1, backgroundColor: bgColor }}
             >
-              <span className="square-num">{num}</span>
+              <span className="square-num">{num === 1 ? '1 Start' : num}</span>
             </div>
           );
         })}

@@ -28,56 +28,24 @@ function App() {
     scrollToBottom();
   }, [chatMessages]);
 
-  // Function to synthesize "Faaah" sound (Snake)
+  // Function to play "Faaah" sound (Snake)
   const playSnakeSound = () => {
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      
-      osc.type = 'sawtooth';
-      // High pitch sliding down to low pitch over 1 second ("Faaah")
-      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 1);
-      
-      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
-      
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 1);
-    } catch(e) {}
+      const audio = new Audio('/fahhh_KcgAXfs.mp3');
+      audio.play();
+    } catch(e) {
+      console.error("Audio play failed", e);
+    }
   };
 
-  // Function to synthesize "Ghop Ghop" sound (Ladder)
+  // Function to play "Ghop Ghop" sound (Ladder)
   const playLadderSound = () => {
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      
-      const playGhop = (startTime) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'square';
-        
-        // Quick low pitch blip ("Ghop")
-        osc.frequency.setValueAtTime(150, startTime);
-        osc.frequency.exponentialRampToValueAtTime(80, startTime + 0.1);
-        
-        gain.gain.setValueAtTime(0.6, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
-        
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(startTime);
-        osc.stop(startTime + 0.1);
-      };
-      
-      // Play two ghops
-      playGhop(audioCtx.currentTime);
-      playGhop(audioCtx.currentTime + 0.2); // 200ms later
-      
-    } catch(e) {}
+      const audio = new Audio('/gopgopgop.mp3');
+      audio.play();
+    } catch(e) {
+      console.error("Audio play failed", e);
+    }
   };
 
   useEffect(() => {

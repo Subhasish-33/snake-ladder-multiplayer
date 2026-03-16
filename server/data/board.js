@@ -3,29 +3,25 @@ const BOARD_SIZE = 100;
 
 // Mapping of starting square to ending square for snakes
 const SNAKES = {
-  16: 6,
-  47: 26,
-  49: 11,
-  56: 53,
-  62: 19,
-  64: 60,
-  87: 24,
-  93: 73,
-  95: 75,
-  98: 78
+  32: 10,
+  34: 6,
+  48: 26,
+  62: 18,
+  88: 24,
+  95: 56,
+  97: 78
 };
 
 // Mapping of starting square to ending square for ladders
 const LADDERS = {
-  11: 30, // Reference: Bottom left ladder
-  15: 44, // Reference: Bottom right ladder
-  26: 67, // Reference: Middle ladder
-  34: 47, // Reference: Middle ladder
-  52: 74, // Reference: Middle ladder
-  58: 83, // Reference: Upper right ladder
-  64: 84, // Reference: Upper middle ladder
-  76: 95, // Reference: Top ladder
-  80: 98  // Reference: Top ladder
+  1: 38,
+  4: 14,
+  8: 30,
+  21: 42,
+  28: 76,
+  50: 67,
+  71: 92,
+  80: 99
 };
 
 // Function to calculate final position after accounting for snakes and ladders
