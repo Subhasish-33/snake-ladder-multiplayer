@@ -202,6 +202,32 @@ function App() {
               );
             })}
           </div>
+          
+          {/* Live Chat Section */}
+          <div className="chat-panel">
+            <h3 style={{ margin: '0 0 10px 0' }}>Live Chat 💬</h3>
+            <div className="chat-messages">
+              {chatMessages.length === 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>No messages yet. Greet everyone! 👋</span>}
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`chat-message ${msg.playerName === (gameState.players[socket.id]?.name || 'Player') ? 'my-message' : ''}`}>
+                  <strong>{msg.playerName}: </strong>
+                  <span>{msg.message}</span>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+            <form className="chat-form" onSubmit={handleSendChat}>
+              <input 
+                type="text" 
+                value={chatInput} 
+                onChange={(e) => setChatInput(e.target.value)} 
+                placeholder="Type a message..." 
+                className="input-field chat-input"
+                maxLength={100}
+              />
+              <button type="submit" className="btn-primary" style={{ padding: '8px 12px', fontSize: '1rem' }}>Send</button>
+            </form>
+          </div>
         </div>
 
         <div className="ticks"></div>
@@ -218,32 +244,6 @@ function App() {
 
       {/* Main Board */}
       <Board players={gameState.players} />
-
-      {/* Right Sidebar: Chat */}
-      <div className="sidebar panel glass chat-panel">
-        <h3 style={{ margin: '0 0 10px 0' }}>Live Chat 💬</h3>
-        <div className="chat-messages">
-          {chatMessages.length === 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>No messages yet. Greet everyone! 👋</span>}
-          {chatMessages.map((msg, i) => (
-            <div key={i} className={`chat-message ${msg.playerName === (gameState.players[socket.id]?.name || 'Player') ? 'my-message' : ''}`}>
-              <strong>{msg.playerName}: </strong>
-              <span>{msg.message}</span>
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-        <form className="chat-form" onSubmit={handleSendChat}>
-          <input 
-            type="text" 
-            value={chatInput} 
-            onChange={(e) => setChatInput(e.target.value)} 
-            placeholder="Type a message..." 
-            className="input-field chat-input"
-            maxLength={100}
-          />
-          <button type="submit" className="btn-primary" style={{ padding: '8px 12px', fontSize: '1rem' }}>Send</button>
-        </form>
-      </div>
 
       {/* Winner Overlay */}
       {winnerPlayer && (

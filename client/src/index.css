@@ -210,7 +210,8 @@ input:focus {
 .chat-panel {
   display: flex;
   flex-direction: column;
-  height: 600px;
+  height: 350px;
+  margin-top: 20px;
 }
 
 .chat-messages {
