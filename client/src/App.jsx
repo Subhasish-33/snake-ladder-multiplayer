@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import RoomLobby from './components/RoomLobby';
 import Board from './components/Board';
@@ -16,6 +16,17 @@ function App() {
   const [currentRoll, setCurrentRoll] = useState(1);
   const [isRolling, setIsRolling] = useState(false);
   const [lastPositions, setLastPositions] = useState({});
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages]);
 
   // Function to synthesize "Faaah" sound (Snake)
   const playSnakeSound = () => {
@@ -106,9 +117,14 @@ function App() {
       }, 1000);
     });
 
+    socket.on('receive-chat', (msg) => {
+      setChatMessages(prev => [...prev, msg]);
+    });
+
     return () => {
       socket.off('update-game');
       socket.off('dice-rolled');
+      socket.off('receive-chat');
     };
   }, []);
 
@@ -174,6 +190,15 @@ function App() {
       socket.emit('leave-room');
       setGameState(null);
       setCurrentRoomId('');
+      setChatMessages([]);
+    }
+  };
+
+  const handleSendChat = (e) => {
+    e.preventDefault();
+    if (chatInput.trim() && currentRoomId) {
+      socket.emit('send-chat', currentRoomId, gameState.players[socket.id]?.name || 'Player', chatInput.trim());
+      setChatInput('');
     }
   };
 
@@ -225,6 +250,32 @@ function App() {
 
       {/* Main Board */}
       <Board players={gameState.players} />
+
+      {/* Right Sidebar: Chat */}
+      <div className="sidebar panel glass chat-panel">
+        <h3 style={{ margin: '0 0 10px 0' }}>Live Chat 💬</h3>
+        <div className="chat-messages">
+          {chatMessages.length === 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>No messages yet. Greet everyone! 👋</span>}
+          {chatMessages.map((msg, i) => (
+            <div key={i} className={`chat-message ${msg.playerName === (gameState.players[socket.id]?.name || 'Player') ? 'my-message' : ''}`}>
+              <strong>{msg.playerName}: </strong>
+              <span>{msg.message}</span>
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+        <form className="chat-form" onSubmit={handleSendChat}>
+          <input 
+            type="text" 
+            value={chatInput} 
+            onChange={(e) => setChatInput(e.target.value)} 
+            placeholder="Type a message..." 
+            className="input-field chat-input"
+            maxLength={100}
+          />
+          <button type="submit" className="btn-primary" style={{ padding: '8px 12px', fontSize: '1rem' }}>Send</button>
+        </form>
+      </div>
 
       {/* Winner Overlay */}
       {winnerPlayer && (

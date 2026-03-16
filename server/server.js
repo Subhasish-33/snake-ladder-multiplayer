@@ -31,6 +31,14 @@ io.on('connection', (socket) => {
     handleRollDice(io, socket, roomId);
   });
 
+  socket.on('send-chat', (roomId, playerName, message) => {
+    io.to(roomId).emit('receive-chat', { playerName, message, timestamp: new Date().toISOString() });
+  });
+
+  socket.on('leave-room', () => {
+    handleDisconnect(io, socket);
+  });
+
   socket.on('disconnect', () => {
     handleDisconnect(io, socket);
     console.log('Player disconnected', socket.id);
