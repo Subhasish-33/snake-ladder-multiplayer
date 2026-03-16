@@ -1,19 +1,22 @@
 /* Main App styling */
 :root {
-  --bg-color: #f3f4f6;
-  --panel-bg: rgba(255, 255, 255, 0.85);
-  --text-main: #1f2937;
-  --text-muted: #6b7280;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --glass-border: rgba(255, 255, 255, 0.5);
+  --bg-color: #0f172a;
+  --panel-bg: rgba(30, 41, 59, 0.7);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --glass-border: rgba(255, 255, 255, 0.1);
 }
 
 body {
   margin: 0;
-  font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-color);
-  background-image: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+  background-image: 
+    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+    radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+    radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
   color: var(--text-main);
   min-height: 100vh;
   display: flex;
@@ -41,9 +44,9 @@ body {
 /* Typography */
 h1, h2, h3 {
   margin-top: 0;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: #111827;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text-main);
 }
 
 /* Buttons */
@@ -84,21 +87,19 @@ button {
 
 input {
   width: 100%;
-  padding: 14px;
-  border-radius: 10px;
-  border: 2px solid #e5e7eb;
-  background: #ffffff;
-  color: #111827;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: rgba(15, 23, 42, 0.6);
+  color: white;
   font-size: 1rem;
   box-sizing: border-box;
   outline: none;
-  transition: all 0.2s;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+  transition: border-color 0.2s;
 }
 
 input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
 }
 
 /* Lobby */
@@ -158,9 +159,8 @@ input:focus {
 
 .player-item.active-turn {
   transform: scale(1.02);
-  border: 2px solid var(--accent);
-  background: rgba(79, 70, 229, 0.05);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
+  border: 1px solid var(--accent);
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .player-token-indicator {
@@ -216,14 +216,13 @@ input:focus {
 .chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 15px;
-  background: #f9fafb;
-  border-radius: 12px;
+  padding: 10px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
   margin-bottom: 15px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  border: 1px solid #e5e7eb;
+  gap: 8px;
 }
 
 .chat-messages::-webkit-scrollbar {
@@ -235,26 +234,23 @@ input:focus {
 }
 
 .chat-message {
-  font-size: 0.95rem;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: #ffffff;
-  color: #1f2937;
+  font-size: 0.9rem;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text-main);
   word-wrap: break-word;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  border: 1px solid #f3f4f6;
   border-bottom-left-radius: 4px;
   align-self: flex-start;
   max-width: 90%;
 }
 
 .chat-message.my-message {
-  background: var(--accent);
-  color: white;
-  border-bottom-left-radius: 14px;
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--text-main);
+  border-bottom-left-radius: 12px;
   border-bottom-right-radius: 4px;
   align-self: flex-end;
-  border: none;
 }
 
 .chat-form {
