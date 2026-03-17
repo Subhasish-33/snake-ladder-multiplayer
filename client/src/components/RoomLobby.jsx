@@ -12,8 +12,8 @@ export default function RoomLobby({ onJoin }) {
   };
 
   return (
-    <div className="lobby-container">
-      <div className="lobby-card glass">
+    <div className="lobby-wrapper">
+      <div className="lobby-card">
         <h1>Snake & Ladder</h1>
         <p>Join a room to play with friends!</p>
         
