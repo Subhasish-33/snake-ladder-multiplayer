@@ -10,6 +10,14 @@ import './index.css';
 const SOCKET_URL = import.meta.env.VITE_SERVER_URL || `http://${window.location.hostname}:3001`;
 const socket = io(SOCKET_URL);
 
+// Deterministic color per username
+const NAME_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#a855f7'];
+function nameColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return NAME_COLORS[Math.abs(hash) % NAME_COLORS.length];
+}
+
 function App() {
   const [inRoom, setInRoom] = useState(false);
   const [gameState, setGameState] = useState(null);
@@ -19,9 +27,19 @@ function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const messagesEndRef = useRef(null);
+  const chatScrollRef = useRef(null);
+  const [autoScroll, setAutoScroll] = useState(true);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (autoScroll && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleChatScroll = (e) => {
+    const el = e.currentTarget;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    setAutoScroll(atBottom);
   };
 
   useEffect(() => {
@@ -203,29 +221,53 @@ function App() {
             })}
           </div>
           
-          {/* Live Chat Section */}
+          {/* Live Chat Section — Twitch Style */}
           <div className="chat-panel">
-            <h3 style={{ margin: '0 0 10px 0' }}>Live Chat 💬</h3>
-            <div className="chat-messages">
-              {chatMessages.length === 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>No messages yet. Greet everyone! 👋</span>}
-              {chatMessages.map((msg, i) => (
-                <div key={i} className={`chat-message ${msg.playerName === (gameState.players[socket.id]?.name || 'Player') ? 'my-message' : ''}`}>
-                  <strong>{msg.playerName}: </strong>
-                  <span>{msg.message}</span>
-                </div>
-              ))}
+            <div className="chat-header">
+              <span className="chat-title">🗨️ Live Chat</span>
+              <span className="chat-live-badge">● LIVE</span>
+            </div>
+            <div className="chat-messages" onScroll={handleChatScroll} ref={chatScrollRef}>
+              {chatMessages.length === 0 && (
+                <span className="chat-empty">No messages yet. Greet everyone! 👋</span>
+              )}
+              {chatMessages.map((msg, i) => {
+                const isMe = msg.playerName === (gameState.players[socket.id]?.name || 'Player');
+                const initials = msg.playerName.slice(0, 2).toUpperCase();
+                const color = nameColor(msg.playerName);
+                const time = msg.timestamp
+                  ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : '';
+                return (
+                  <div key={i} className={`twitch-msg ${isMe ? 'twitch-msg--me' : ''}`}>
+                    <div className="twitch-avatar" style={{ background: color }}>{initials}</div>
+                    <div className="twitch-body">
+                      <div className="twitch-meta">
+                        <span className="twitch-name" style={{ color }}>{msg.playerName}</span>
+                        {isMe && <span className="twitch-badge twitch-badge--you">YOU</span>}
+                        <span className="twitch-time">{time}</span>
+                      </div>
+                      <p className="twitch-text">{msg.message}</p>
+                    </div>
+                  </div>
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
+            {!autoScroll && (
+              <button className="chat-scroll-btn" onClick={() => { setAutoScroll(true); scrollToBottom(); }}>↓ New messages</button>
+            )}
             <form className="chat-form" onSubmit={handleSendChat}>
-              <input 
-                type="text" 
-                value={chatInput} 
-                onChange={(e) => setChatInput(e.target.value)} 
-                placeholder="Type a message..." 
-                className="input-field chat-input"
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Send a message..."
+                className="chat-input"
                 maxLength={100}
+                autoComplete="off"
               />
-              <button type="submit" className="btn-primary" style={{ padding: '8px 12px', fontSize: '1rem' }}>Send</button>
+              <button type="submit" className="chat-send-btn">Send</button>
             </form>
           </div>
         </div>
