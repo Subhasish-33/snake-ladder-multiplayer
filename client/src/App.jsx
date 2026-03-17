@@ -5,132 +5,171 @@ import Board from './components/Board';
 import Dice from './components/Dice';
 import './index.css';
 
-// Connect to the backend server unconditionally
-// Connect to backend (automatically use the current hostname so other devices on network can connect)
 const SOCKET_URL = import.meta.env.VITE_SERVER_URL || `http://${window.location.hostname}:3001`;
 const socket = io(SOCKET_URL);
 
 // Deterministic color per username
 const NAME_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#a855f7'];
-function nameColor(name) {
+function nameColor(name = '') {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return NAME_COLORS[Math.abs(hash) % NAME_COLORS.length];
 }
 
+// ── Circular countdown timer component ──────────────────────────────────────
+function CircularTimer({ timeLeft, total = 30, isMe }) {
+  const r = 16, circ = 2 * Math.PI * r;
+  const pct = Math.max(0, timeLeft / total);
+  const danger = timeLeft <= 10;
+  const color = danger ? '#ef4444' : isMe ? '#22c55e' : '#94a3b8';
+  return (
+    <svg width="40" height="40" viewBox="0 0 40 40" style={{ flexShrink: 0 }}>
+      <circle cx="20" cy="20" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3"/>
+      <circle
+        cx="20" cy="20" r={r} fill="none"
+        stroke={color} strokeWidth="3"
+        strokeDasharray={circ}
+        strokeDashoffset={circ * (1 - pct)}
+        strokeLinecap="round"
+        transform="rotate(-90 20 20)"
+        style={{ transition: 'stroke-dashoffset 0.25s linear, stroke 0.3s' }}
+      />
+      <text x="20" y="24" textAnchor="middle" fill={color}
+        fontSize={timeLeft >= 10 ? "10" : "11"} fontWeight="700" fontFamily="Inter, sans-serif">
+        {timeLeft}
+      </text>
+    </svg>
+  );
+}
+
 function App() {
   const [inRoom, setInRoom] = useState(false);
   const [gameState, setGameState] = useState(null);
+  const [currentRoomId, setCurrentRoomId] = useState('');
   const [currentRoll, setCurrentRoll] = useState(1);
   const [isRolling, setIsRolling] = useState(false);
-  const [lastPositions, setLastPositions] = useState({});
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
-  const [turnExpiresAt, setTurnExpiresAt] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [skipToast, setSkipToast] = useState(null);
-  const messagesEndRef = useRef(null);
-  const chatScrollRef = useRef(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
+  // Turn timer
+  const [turnExpiresAt, setTurnExpiresAt] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(30);
+
+  // Skip toast
+  const [skipToast, setSkipToast] = useState(null);
+
+  // Stats: { socketId: { rolls, snakes, ladders } }
+  const [stats, setStats] = useState({});
+
+  // Emoji reactions
+  const EMOJIS = ['🔥','😂','😱','👏','💀','🐍','🪜','🎲'];
+  const [reactions, setReactions] = useState([]); // [{emoji, x, y, id}]
+
+  const messagesEndRef = useRef(null);
+
+  // ── Chat scroll ──────────────────────────────────────────────────────────
   const scrollToBottom = () => {
     if (autoScroll && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   };
+  useEffect(() => { scrollToBottom(); }, [chatMessages]);
 
   const handleChatScroll = (e) => {
     const el = e.currentTarget;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-    setAutoScroll(atBottom);
+    setAutoScroll(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [chatMessages]);
-
-  // Live countdown ticker
+  // ── Turn countdown ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!turnExpiresAt) return;
-    const tick = () => {
-      const remaining = Math.max(0, Math.round((turnExpiresAt - Date.now()) / 1000));
-      setTimeLeft(remaining);
-    };
+    const tick = () => setTimeLeft(Math.max(0, Math.round((turnExpiresAt - Date.now()) / 1000)));
     tick();
-    const interval = setInterval(tick, 250);
-    return () => clearInterval(interval);
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
   }, [turnExpiresAt]);
 
-  // Function to play "Faaah" sound (Snake)
-  const playSnakeSound = () => {
+  // ── Sounds ───────────────────────────────────────────────────────────────
+  const playSound = (src, maxMs) => {
     try {
-      const audio = new Audio('/fahhh_KcgAXfs.mp3');
-      audio.play();
-    } catch(e) {
-      console.error("Audio play failed", e);
-    }
+      const a = new Audio(src);
+      a.play();
+      if (maxMs) setTimeout(() => { a.pause(); a.currentTime = 0; }, maxMs);
+    } catch(e) {}
+  };
+  const playSnakeSound  = () => playSound('/fahhh_KcgAXfs.mp3');
+  const playLadderSound = () => playSound('/gopgopgop.mp3', 2000);
+  const playTurnSound   = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(880, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
+      g.gain.setValueAtTime(0.3, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.3);
+    } catch(e) {}
   };
 
-  // Function to play "Ghop Ghop" sound (Ladder) — trimmed to 2 seconds
-  const playLadderSound = () => {
-    try {
-      const audio = new Audio('/gopgopgop.mp3');
-      audio.play();
-      setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 2000);
-    } catch(e) {
-      console.error("Audio play failed", e);
-    }
-  };
-
+  // ── Socket listeners ─────────────────────────────────────────────────────
   useEffect(() => {
-    // Listen for game updates
     socket.on('update-game', (state) => {
-      // Check for position changes to trigger sounds
       if (state.status === 'playing' || state.status === 'finished') {
-        Object.values(state.players).forEach(player => {
-          setLastPositions(prev => {
-            const oldPos = prev[player.id];
-            const newPos = player.position;
-            
-            if (oldPos && newPos !== oldPos) {
-              const diff = newPos - oldPos;
-              if (diff > 6) {
-                playLadderSound(); // Up a ladder!
-              } else if (diff < 0) {
-                playSnakeSound(); // Down a snake!
-              }
-            }
-            return { ...prev, [player.id]: newPos };
+        setStats(prev => {
+          const next = { ...prev };
+          Object.values(state.players).forEach(player => {
+            const old = prev[player.id];
+            if (!old) { next[player.id] = { rolls: 0, snakes: 0, ladders: 0 }; return; }
+            const diff = player.position - (old._lastPos ?? 1);
+            if (diff > 6)  next[player.id] = { ...old, ladders: old.ladders + 1, _lastPos: player.position };
+            else if (diff < 0) next[player.id] = { ...old, snakes: old.snakes + 1, _lastPos: player.position };
+            else next[player.id] = { ...old, _lastPos: player.position };
           });
+          return next;
         });
       }
-      
       setGameState(state);
     });
 
-    // Listen for dice roll animations
-    socket.on('dice-rolled', ({ roll }) => {
+    socket.on('dice-rolled', ({ playerId, roll }) => {
+      // Track rolls per player in stats
+      setStats(prev => {
+        const s = prev[playerId] || { rolls: 0, snakes: 0, ladders: 0 };
+        return { ...prev, [playerId]: { ...s, rolls: s.rolls + 1 } };
+      });
       setIsRolling(true);
       setCurrentRoll(roll);
-      
-      // Stop the rolling animation after the server delay (1s) finishes
-      setTimeout(() => {
-        setIsRolling(false);
-      }, 1000);
+      setTimeout(() => setIsRolling(false), 1000);
     });
 
-    socket.on('receive-chat', (msg) => {
-      setChatMessages(prev => [...prev, msg]);
-    });
+    socket.on('receive-chat', (msg) => setChatMessages(prev => [...prev, msg]));
 
-    socket.on('turn-start', ({ expiresAt }) => {
+    socket.on('turn-start', ({ expiresAt, currentPlayerId }) => {
       setTurnExpiresAt(expiresAt);
+      if (currentPlayerId === socket.id) playTurnSound();
     });
 
     socket.on('turn-skipped', ({ skippedId }) => {
-      // Show a brief toast notification
       setSkipToast(skippedId);
-      setTimeout(() => setSkipToast(null), 3000);
+      setTimeout(() => setSkipToast(null), 3500);
+    });
+
+    // Listen for position changes to play sounds
+    socket.on('update-game', (state) => {
+      if (state.status === 'playing') {
+        Object.values(state.players).forEach(p => {
+          setStats(prev => {
+            const old = prev[p.id];
+            if (!old) return prev;
+            const diff = p.position - (old._lastPos ?? p.position);
+            if (diff > 6) playLadderSound();
+            else if (diff < 0) playSnakeSound();
+            return prev;
+          });
+        });
+      }
     });
 
     return () => {
@@ -142,220 +181,236 @@ function App() {
     };
   }, []);
 
-  const handleJoinRoom = (roomId, playerName) => {
-    socket.emit('join-room', roomId, playerName);
-    setInRoom(true);
-  };
-
-  const handleRollDice = () => {
-    if (!gameState) return;
-    const roomId = Object.keys(gameState.players).length > 0 ? getRoomIdFromSocket() : null; // We need room id, wait, server only needs roomId to know, we have to store roomId
-  };
-
-  // Wait, the client needs the roomId to emit roll-dice, let's keep track of it
-  const [currentRoomId, setCurrentRoomId] = useState('');
-
+  // ── Actions ──────────────────────────────────────────────────────────────
   const handleJoinRoomUpdated = (roomId, playerName) => {
     setCurrentRoomId(roomId);
     socket.emit('join-room', roomId, playerName);
     setInRoom(true);
   };
 
-  const handleRollDiceUpdated = () => {
-    socket.emit('roll-dice', currentRoomId);
-  };
-
-  const handleStartGame = () => {
-    socket.emit('start-game', currentRoomId);
-  }
-
-  // If not in a room, show Lobby
-  if (!inRoom) {
-    return <RoomLobby onJoin={handleJoinRoomUpdated} />;
-  }
-
-  // Loading state while waiting for initial server sync
-  if (!gameState) {
-    return <div className="glass" style={{padding: '40px'}}>Connecting to game...</div>;
-  }
-
-  // Helper bindings
-  const playersInRoom = Object.values(gameState.players);
-  const isMyTurn = gameState.status === 'playing' && gameState.playerOrder[gameState.turnIndex] === socket.id;
-  
-  // Find the winning player if the game is over
-  const winnerPlayer = gameState.status === 'finished' 
-    ? Object.values(gameState.players).find(p => p.position >= 100) 
-    : null;
-
-  const getStatusMessage = () => {
-    if (gameState.status === 'waiting') {
-      return 'Waiting for players...';
-    } else if (gameState.status === 'playing') {
-      return 'Game In Progress';
-    } else if (gameState.status === 'finished') {
-      return 'Game Over!';
-    }
-    return '';
-  };
+  const handleRollDiceUpdated = () => socket.emit('roll-dice', currentRoomId);
+  const handleStartGame = () => socket.emit('start-game', currentRoomId);
 
   const handleExitGame = () => {
-    if (confirm("Are you sure you want to leave the game?")) {
+    if (confirm('Are you sure you want to leave the game?')) {
       socket.emit('leave-room');
       setGameState(null);
       setCurrentRoomId('');
       setChatMessages([]);
+      setStats({});
+      setTurnExpiresAt(null);
+      setInRoom(false);
     }
   };
 
   const handleSendChat = (e) => {
     e.preventDefault();
     if (chatInput.trim() && currentRoomId) {
-      socket.emit('send-chat', currentRoomId, gameState.players[socket.id]?.name || 'Player', chatInput.trim());
+      socket.emit('send-chat', currentRoomId, gameState?.players[socket.id]?.name || 'Player', chatInput.trim());
       setChatInput('');
     }
   };
 
+  const sendReaction = (emoji) => {
+    const id = Date.now() + Math.random();
+    // Random position around the board center
+    const x = 40 + Math.random() * 20;
+    const y = 40 + Math.random() * 20;
+    setReactions(prev => [...prev, { emoji, x, y, id }]);
+    setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 2000);
+    // Also send to chat
+    socket.emit('send-chat', currentRoomId, gameState?.players[socket.id]?.name || 'Player', emoji);
+  };
+
+  // ── Guards ───────────────────────────────────────────────────────────────
+  if (!inRoom) return <RoomLobby onJoin={handleJoinRoomUpdated} />;
+  if (!gameState) return <div className="glass" style={{padding:'40px',textAlign:'center'}}>Connecting... 🎲</div>;
+
+  const playersInRoom = Object.values(gameState.players);
+  const currentTurnId = gameState.status === 'playing' ? gameState.playerOrder[gameState.turnIndex] : null;
+  const isMyTurn = currentTurnId === socket.id;
+  const winnerPlayer = gameState.status === 'finished'
+    ? Object.values(gameState.players).find(p => p.position >= 100)
+    : null;
+
+  const statusLabel = {
+    waiting: 'Waiting for players…',
+    playing: 'Game In Progress',
+    finished: 'Game Over!'
+  }[gameState.status] ?? '';
+
   return (
     <div className="game-container">
-      
-      {/* Left Sidebar: Status, Players, Dice */}
+
+      {/* ─── LEFT SIDEBAR ─────────────────────────────────────────────── */}
       <div className="sidebar panel glass">
-        <div>
-          <h2>Room: {currentRoomId}</h2>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <p className="status-text" style={{ color: gameState.status === 'playing' ? '#10b981' : '#f59e0b' }}>{getStatusMessage()}</p>
-            <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.9rem', backgroundColor: '#ef4444', border: 'none' }} onClick={handleExitGame}>Exit</button>
+
+        {/* Room header */}
+        <div className="room-header">
+          <div>
+            <h2 style={{ margin: 0 }}>Room: {currentRoomId}</h2>
+            <p className="status-text" style={{
+              margin: '4px 0 0',
+              color: gameState.status === 'playing' ? '#10b981' : '#f59e0b',
+              fontSize: '0.85rem', fontWeight: 600
+            }}>{statusLabel}</p>
           </div>
+          <button className="exit-btn" onClick={handleExitGame}>Exit</button>
+        </div>
 
-          {gameState.status === 'waiting' && playersInRoom.length >= 2 && (
-             <button className="btn-primary" onClick={handleStartGame}>Start Game Now</button>
-          )}
+        {/* Start game button */}
+        {gameState.status === 'waiting' && playersInRoom.length >= 2 && (
+          <button className="btn-primary" style={{ marginBottom: '12px' }} onClick={handleStartGame}>
+            ▶ Start Game Now
+          </button>
+        )}
 
-          <div className="player-list">
-            <h3>Players ({playersInRoom.length})</h3>
-            {playersInRoom.map(p => {
-              const isActiveTurn = gameState.status === 'playing' && gameState.playerOrder[gameState.turnIndex] === p.id;
+        {/* YOUR TURN banner */}
+        {isMyTurn && gameState.status === 'playing' && (
+          <div className="your-turn-banner">
+            🎲 YOUR TURN!
+          </div>
+        )}
+
+        {/* Player List */}
+        <div className="player-list">
+          <h3 style={{ marginTop: 0 }}>Players ({playersInRoom.length})</h3>
+          {playersInRoom.map(p => {
+            const isActive = p.id === currentTurnId && gameState.status === 'playing';
+            const isMe = p.id === socket.id;
+            const pStats = stats[p.id] || { rolls: 0, snakes: 0, ladders: 0 };
+            return (
+              <div key={p.id} className={`player-item ${isActive ? 'active-turn' : ''}`}
+                style={ isActive ? { borderColor: p.color, boxShadow: `0 0 12px ${p.color}55` } : {}}>
+                <div className="player-token-indicator" style={{ backgroundColor: p.color }} />
+                <div className="player-info">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600 }}>{p.name} {isMe ? '(You)' : ''}</span>
+                    {isActive && !isMe && <span className="turn-badge">THEIR TURN</span>}
+                    {isActive && isMe  && <span className="turn-badge my-turn-badge">YOUR TURN</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                    <span>📍 {p.position}</span>
+                    <span>🎲 {pStats.rolls}</span>
+                    <span>🐍 {pStats.snakes}</span>
+                    <span>🪜 {pStats.ladders}</span>
+                  </div>
+                </div>
+                {/* Circular timer — only shown next to the active player */}
+                {isActive && gameState.status === 'playing' && (
+                  <CircularTimer timeLeft={timeLeft} total={30} isMe={isMe} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Dice — only when playing */}
+        {gameState.status === 'playing' && (
+          <Dice
+            roll={currentRoll}
+            onRoll={handleRollDiceUpdated}
+            isMyTurn={isMyTurn}
+            isRolling={isRolling}
+          />
+        )}
+
+        {/* Emoji reactions bar */}
+        {gameState.status === 'playing' && (
+          <div className="emoji-bar">
+            {EMOJIS.map(e => (
+              <button key={e} className="emoji-btn" onClick={() => sendReaction(e)}>{e}</button>
+            ))}
+          </div>
+        )}
+
+        {/* Live Chat */}
+        <div className="chat-panel">
+          <div className="chat-header">
+            <span className="chat-title">🗨️ Live Chat</span>
+            <span className="chat-live-badge">● LIVE</span>
+          </div>
+          <div className="chat-messages" onScroll={handleChatScroll} ref={messagesEndRef}>
+            {chatMessages.length === 0 && (
+              <span className="chat-empty">No messages yet. Greet everyone! 👋</span>
+            )}
+            {chatMessages.map((msg, i) => {
+              const isMe = msg.playerName === (gameState.players[socket.id]?.name || 'Player');
+              const color = nameColor(msg.playerName);
+              const time = msg.timestamp
+                ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '';
               return (
-                <div key={p.id} className={`player-item ${isActiveTurn ? 'active-turn' : ''}`}>
-                  <div className="player-token-indicator" style={{ backgroundColor: p.color }}></div>
-                  <div className="player-info">
-                    <span>{p.name} {p.id === socket.id ? '(You)' : ''}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>Pos: {p.position}</span>
+                <div key={i} className={`twitch-msg ${isMe ? 'twitch-msg--me' : ''}`}>
+                  <div className="twitch-avatar" style={{ background: color }}>
+                    {msg.playerName.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="twitch-body">
+                    <div className="twitch-meta">
+                      <span className="twitch-name" style={{ color }}>{msg.playerName}</span>
+                      {isMe && <span className="twitch-badge twitch-badge--you">YOU</span>}
+                      <span className="twitch-time">{time}</span>
+                    </div>
+                    <p className="twitch-text">{msg.message}</p>
                   </div>
                 </div>
               );
             })}
+            <div ref={messagesEndRef} />
           </div>
-          
-          {/* Live Chat Section — Twitch Style */}
-          <div className="chat-panel">
-            <div className="chat-header">
-              <span className="chat-title">🗨️ Live Chat</span>
-              <span className="chat-live-badge">● LIVE</span>
-            </div>
-            <div className="chat-messages" onScroll={handleChatScroll} ref={chatScrollRef}>
-              {chatMessages.length === 0 && (
-                <span className="chat-empty">No messages yet. Greet everyone! 👋</span>
-              )}
-              {chatMessages.map((msg, i) => {
-                const isMe = msg.playerName === (gameState.players[socket.id]?.name || 'Player');
-                const initials = msg.playerName.slice(0, 2).toUpperCase();
-                const color = nameColor(msg.playerName);
-                const time = msg.timestamp
-                  ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                  : '';
-                return (
-                  <div key={i} className={`twitch-msg ${isMe ? 'twitch-msg--me' : ''}`}>
-                    <div className="twitch-avatar" style={{ background: color }}>{initials}</div>
-                    <div className="twitch-body">
-                      <div className="twitch-meta">
-                        <span className="twitch-name" style={{ color }}>{msg.playerName}</span>
-                        {isMe && <span className="twitch-badge twitch-badge--you">YOU</span>}
-                        <span className="twitch-time">{time}</span>
-                      </div>
-                      <p className="twitch-text">{msg.message}</p>
-                    </div>
-                  </div>
-                );
-              })}
-              <div ref={messagesEndRef} />
-            </div>
-            {!autoScroll && (
-              <button className="chat-scroll-btn" onClick={() => { setAutoScroll(true); scrollToBottom(); }}>↓ New messages</button>
-            )}
-            <form className="chat-form" onSubmit={handleSendChat}>
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Send a message..."
-                className="chat-input"
-                maxLength={100}
-                autoComplete="off"
-              />
-              <button type="submit" className="chat-send-btn">Send</button>
-            </form>
-          </div>
+          {!autoScroll && (
+            <button className="chat-scroll-btn" onClick={() => { setAutoScroll(true); scrollToBottom(); }}>
+              ↓ New messages
+            </button>
+          )}
+          <form className="chat-form" onSubmit={handleSendChat}>
+            <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)}
+              placeholder="Send a message…" className="chat-input" maxLength={100} autoComplete="off" />
+            <button type="submit" className="chat-send-btn">Send</button>
+          </form>
         </div>
-
-        <div className="ticks"></div>
-
-        {gameState.status === 'playing' && (
-          <>
-            {/* Countdown Timer Bar */}
-            <div className="turn-timer">
-              <div className="turn-timer-label">
-                {isMyTurn
-                  ? timeLeft <= 10
-                    ? `⏰ Hurry! ${timeLeft}s`
-                    : `⏳ Your turn — ${timeLeft}s`
-                  : `⏳ ${timeLeft}s`}
-              </div>
-              <div className="turn-timer-bar">
-                <div
-                  className={`turn-timer-fill ${timeLeft <= 10 ? 'danger' : ''}`}
-                  style={{ width: `${(timeLeft / 30) * 100}%` }}
-                />
-              </div>
-            </div>
-            <Dice
-              roll={currentRoll}
-              onRoll={handleRollDiceUpdated}
-              isMyTurn={isMyTurn}
-              isRolling={isRolling}
-            />
-          </>
-        )}
       </div>
 
-      {/* Main Board */}
-      <Board players={gameState.players} />
+      {/* ─── MAIN BOARD ───────────────────────────────────────────────── */}
+      <div style={{ position: 'relative', flex: 2 }}>
+        <Board players={gameState.players} />
 
-      {/* Skip Toast */}
+        {/* Floating emoji reactions over board */}
+        {reactions.map(r => (
+          <div key={r.id} className="floating-reaction"
+            style={{ left: `${r.x}%`, top: `${r.y}%` }}>
+            {r.emoji}
+          </div>
+        ))}
+      </div>
+
+      {/* ─── SKIP TOAST ───────────────────────────────────────────────── */}
       {skipToast && (
         <div className="skip-toast">
-          ⏰ {gameState.players[skipToast]?.name || 'A player'} timed out! Turn skipped.
+          ⏰ {gameState.players[skipToast]?.name || 'A player'} ran out of time! Turn skipped.
         </div>
       )}
 
-      {/* Winner Overlay */}
+      {/* ─── WINNER OVERLAY ───────────────────────────────────────────── */}
       {winnerPlayer && (
         <div className="winner-overlay">
           <div className="winner-card glass">
+            <div className="confetti">🎉🎊🏆🎊🎉</div>
             <h2>🏆 Winner! 🏆</h2>
-            <div className="winner-badge" style={{ margin: '20px 0', fontSize: '5rem', animation: 'bounce 2s infinite' }}>
-              🏅
+            <div style={{ fontSize: '5rem', animation: 'bounce 0.6s ease infinite alternate' }}>🏅</div>
+            <p style={{ fontSize: '1.3rem' }}><strong>{winnerPlayer.name}</strong> reached square 100!</p>
+            <div className="winner-stats">
+              {(() => { const s = stats[winnerPlayer.id] || {}; return (
+                <><span>🎲 {s.rolls || 0} rolls</span><span>🐍 {s.snakes || 0} snakes</span><span>🪜 {s.ladders || 0} ladders</span></>
+              ); })()}
             </div>
-            <p style={{ fontSize: '1.2rem' }}><strong>{winnerPlayer.name}</strong> has reached the end!</p>
-            <div style={{ marginTop: '20px' }}>
-              <button className="btn-primary" onClick={() => socket.emit('join-room', currentRoomId, gameState.players[socket.id].name)}>Play Again</button>
-            </div>
+            <button className="btn-primary" style={{ marginTop: 20 }}
+              onClick={() => socket.emit('join-room', currentRoomId, gameState.players[socket.id]?.name)}>
+              Play Again
+            </button>
           </div>
         </div>
       )}
-
     </div>
   );
 }

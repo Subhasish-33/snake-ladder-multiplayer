@@ -138,42 +138,97 @@ input:focus {
 }
 
 /* Status Panel */
-.status-panel {
-  padding: 24px;
+.room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
 }
 
+.exit-btn {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.exit-btn:hover { background: #dc2626; }
+
+/* YOUR TURN Banner */
+.your-turn-banner {
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  color: #fff;
+  text-align: center;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  animation: pulse-banner 1s ease-in-out infinite alternate;
+}
+@keyframes pulse-banner {
+  from { box-shadow: 0 0 8px #22c55e55; }
+  to   { box-shadow: 0 0 20px #22c55eaa; }
+}
+
+/* Player List */
 .player-list {
-  margin-top: 20px;
+  margin-top: 4px;
 }
 
 .player-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px 12px;
   background: rgba(0,0,0,0.2);
-  border-radius: 8px;
+  border-radius: 10px;
   margin-bottom: 8px;
-  transition: transform 0.2s;
+  border: 1.5px solid transparent;
+  transition: all 0.3s ease;
 }
 
 .player-item.active-turn {
   transform: scale(1.02);
-  border: 1px solid var(--accent);
-  background: rgba(59, 130, 246, 0.1);
+  background: rgba(255,255,255,0.05);
 }
 
 .player-token-indicator {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  box-shadow: inset -2px -2px 4px rgba(0,0,0,0.3);
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
 }
 
 .player-info {
   flex: 1;
+  min-width: 0;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+}
+
+/* Turn badges */
+.turn-badge {
+  font-size: 0.58rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #3b82f6;
+  color: #fff;
+  letter-spacing: 0.04em;
+}
+.my-turn-badge {
+  background: #22c55e;
+  animation: pulse-badge 0.8s ease infinite alternate;
+}
+@keyframes pulse-badge {
+  from { box-shadow: 0 0 4px #22c55e; }
+  to   { box-shadow: 0 0 10px #22c55e; }
 }
 
 .winner-overlay {
@@ -190,58 +245,46 @@ input:focus {
 .winner-card {
   padding: 40px;
   text-align: center;
-  transform: scale(1);
   animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  max-width: 420px;
+  width: 90%;
 }
 
 .winner-card h2 {
   font-size: 3rem;
-  margin-bottom: 10px;
+  margin: 10px 0;
   background: linear-gradient(to right, #f59e0b, #ef4444);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
+.confetti {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  animation: spin-confetti 1.5s linear infinite;
+}
+@keyframes spin-confetti {
+  from { letter-spacing: 4px; }
+  to   { letter-spacing: 12px; }
+}
+
+.winner-stats {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+@keyframes bounce {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-12px); }
+}
+
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-/* Turn Timer */
-.turn-timer {
-  padding: 10px 0 6px;
-}
-
-.turn-timer-label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-  letter-spacing: 0.03em;
-}
-
-.turn-timer-bar {
-  height: 6px;
-  background: rgba(255,255,255,0.08);
-  border-radius: 99px;
-  overflow: hidden;
-}
-
-.turn-timer-fill {
-  height: 100%;
-  background: #22c55e;
-  border-radius: 99px;
-  transition: width 0.25s linear, background 0.3s;
-}
-
-.turn-timer-fill.danger {
-  background: #ef4444;
-  animation: timer-pulse 0.5s ease-in-out infinite alternate;
-}
-
-@keyframes timer-pulse {
-  from { opacity: 1; }
-  to   { opacity: 0.5; }
-}
 
 /* Skip Toast */
 .skip-toast {
@@ -264,6 +307,41 @@ input:focus {
 @keyframes slideUp {
   from { opacity: 0; transform: translateX(-50%) translateY(20px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Emoji Reaction Bar */
+.emoji-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: -10px;
+}
+
+.emoji-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+  line-height: 1;
+}
+.emoji-btn:hover { background: rgba(255,255,255,0.14); transform: scale(1.2); }
+.emoji-btn:active { transform: scale(0.9); }
+
+/* Floating emoji reactions over board */
+.floating-reaction {
+  position: absolute;
+  font-size: 2rem;
+  pointer-events: none;
+  animation: float-up 2s ease forwards;
+  z-index: 50;
+}
+
+@keyframes float-up {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
 }
 
 /* Chat Panel */
