@@ -26,6 +26,9 @@ function App() {
   const [lastPositions, setLastPositions] = useState({});
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
+  const [turnExpiresAt, setTurnExpiresAt] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [skipToast, setSkipToast] = useState(null);
   const messagesEndRef = useRef(null);
   const chatScrollRef = useRef(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -45,6 +48,18 @@ function App() {
   useEffect(() => {
     scrollToBottom();
   }, [chatMessages]);
+
+  // Live countdown ticker
+  useEffect(() => {
+    if (!turnExpiresAt) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.round((turnExpiresAt - Date.now()) / 1000));
+      setTimeLeft(remaining);
+    };
+    tick();
+    const interval = setInterval(tick, 250);
+    return () => clearInterval(interval);
+  }, [turnExpiresAt]);
 
   // Function to play "Faaah" sound (Snake)
   const playSnakeSound = () => {
@@ -107,10 +122,22 @@ function App() {
       setChatMessages(prev => [...prev, msg]);
     });
 
+    socket.on('turn-start', ({ expiresAt }) => {
+      setTurnExpiresAt(expiresAt);
+    });
+
+    socket.on('turn-skipped', ({ skippedId }) => {
+      // Show a brief toast notification
+      setSkipToast(skippedId);
+      setTimeout(() => setSkipToast(null), 3000);
+    });
+
     return () => {
       socket.off('update-game');
       socket.off('dice-rolled');
       socket.off('receive-chat');
+      socket.off('turn-start');
+      socket.off('turn-skipped');
     };
   }, []);
 
@@ -275,17 +302,42 @@ function App() {
         <div className="ticks"></div>
 
         {gameState.status === 'playing' && (
-          <Dice 
-            roll={currentRoll} 
-            onRoll={handleRollDiceUpdated} 
-            isMyTurn={isMyTurn} 
-            isRolling={isRolling} 
-          />
+          <>
+            {/* Countdown Timer Bar */}
+            <div className="turn-timer">
+              <div className="turn-timer-label">
+                {isMyTurn
+                  ? timeLeft <= 10
+                    ? `⏰ Hurry! ${timeLeft}s`
+                    : `⏳ Your turn — ${timeLeft}s`
+                  : `⏳ ${timeLeft}s`}
+              </div>
+              <div className="turn-timer-bar">
+                <div
+                  className={`turn-timer-fill ${timeLeft <= 10 ? 'danger' : ''}`}
+                  style={{ width: `${(timeLeft / 30) * 100}%` }}
+                />
+              </div>
+            </div>
+            <Dice
+              roll={currentRoll}
+              onRoll={handleRollDiceUpdated}
+              isMyTurn={isMyTurn}
+              isRolling={isRolling}
+            />
+          </>
         )}
       </div>
 
       {/* Main Board */}
       <Board players={gameState.players} />
+
+      {/* Skip Toast */}
+      {skipToast && (
+        <div className="skip-toast">
+          ⏰ {gameState.players[skipToast]?.name || 'A player'} timed out! Turn skipped.
+        </div>
+      )}
 
       {/* Winner Overlay */}
       {winnerPlayer && (

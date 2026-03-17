@@ -1,18 +1,10 @@
 const { BOARD_SIZE, calculateFinalPosition } = require('../data/board');
 
-// Object to store the state of all active games
-// Structure:
-// rooms[roomId] = {
-//   players: { socketId: { id: socketId, position: Number, name: String, color: String } },
-//   playerOrder: [socketId1, socketId2, ...], // To keep track of turns
-//   turnIndex: 0, // Whose turn it is currently (index of playerOrder)
-//   status: 'waiting' | 'playing' | 'finished',
-//   winner: null
-// }
 const rooms = {};
-
-// Colors for the players to easily distinguish them
 const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+const TURN_SECONDS = 30;
+
+// ── helpers ────────────────────────────────────────────────────────────────
 
 function getRoom(roomId) {
   if (!rooms[roomId]) {
@@ -21,32 +13,65 @@ function getRoom(roomId) {
       playerOrder: [],
       turnIndex: 0,
       status: 'waiting',
-      winner: null
+      winner: null,
+      _timer: null          // server-side timeout handle
     };
   }
   return rooms[roomId];
 }
 
+/** Clears any running timer for this room */
+function clearTurnTimer(room) {
+  if (room._timer) {
+    clearTimeout(room._timer);
+    room._timer = null;
+  }
+}
+
+/** Starts (or restarts) the 30-second auto-skip timer */
+function startTurnTimer(io, roomId) {
+  const room = rooms[roomId];
+  if (!room || room.status !== 'playing') return;
+
+  clearTurnTimer(room);
+
+  // Tell every client when this turn expires so they can show a countdown
+  const expiresAt = Date.now() + TURN_SECONDS * 1000;
+  io.to(roomId).emit('turn-start', { expiresAt, currentPlayerId: room.playerOrder[room.turnIndex] });
+
+  room._timer = setTimeout(() => {
+    if (!rooms[roomId] || rooms[roomId].status !== 'playing') return;
+    const r = rooms[roomId];
+
+    // Skip this player's turn
+    r.turnIndex = (r.turnIndex + 1) % r.playerOrder.length;
+    io.to(roomId).emit('turn-skipped', { skippedId: r.playerOrder[(r.turnIndex - 1 + r.playerOrder.length) % r.playerOrder.length] });
+    io.to(roomId).emit('update-game', r);
+
+    // Restart the timer for the next player
+    startTurnTimer(io, roomId);
+  }, TURN_SECONDS * 1000);
+}
+
+// ── handlers ───────────────────────────────────────────────────────────────
+
 function handleJoinRoom(io, socket, roomId, playerName = 'Player') {
   socket.join(roomId);
   const room = getRoom(roomId);
-  
-  // Assign a color based on order
   const colorIndex = room.playerOrder.length % COLORS.length;
-  
+
   if (!room.players[socket.id]) {
     room.players[socket.id] = {
       id: socket.id,
-      position: 1, // Start at square 1
+      position: 1,
       name: `${playerName} ${room.playerOrder.length + 1}`,
       color: COLORS[colorIndex]
     };
     room.playerOrder.push(socket.id);
   }
 
-  // Auto-start if it's waiting and we have 2+ players (We can let them manually start, but for simplicity let's stick to waiting/playing)
   if (room.status === 'finished') {
-    // Reset if joining a finished game
+    clearTurnTimer(room);
     room.status = 'waiting';
     room.winner = null;
     room.turnIndex = 0;
@@ -54,17 +79,16 @@ function handleJoinRoom(io, socket, roomId, playerName = 'Player') {
   }
 
   console.log(`User ${socket.id} joined room ${roomId}`);
-  
-  // Broadcast the updated state to everyone in the room
   io.to(roomId).emit('update-game', room);
 }
 
 function handleStartGame(io, socket, roomId) {
   const room = rooms[roomId];
   if (room && room.playerOrder.length >= 2) {
-      room.status = 'playing';
-      room.turnIndex = 0;
-      io.to(roomId).emit('update-game', room);
+    room.status = 'playing';
+    room.turnIndex = 0;
+    io.to(roomId).emit('update-game', room);
+    startTurnTimer(io, roomId);
   }
 }
 
@@ -72,70 +96,62 @@ function handleRollDice(io, socket, roomId) {
   const room = rooms[roomId];
   if (!room || room.status !== 'playing') return;
 
-  // Check if it's the player's turn
   const currentPlayerId = room.playerOrder[room.turnIndex];
   if (currentPlayerId !== socket.id) return; // Not their turn
 
-  // Roll the dice!
+  // Player is rolling — cancel the auto-skip timer
+  clearTurnTimer(room);
+
   const roll = Math.floor(Math.random() * 6) + 1;
   const player = room.players[socket.id];
-  
-  // Broadcast dice animation instantly before calculated movement
+
   io.to(roomId).emit('dice-rolled', { playerId: socket.id, roll });
 
-  // Wait a short moment for animation before actually moving
   setTimeout(() => {
     let newPosition = player.position + roll;
-    
-    // Bounds check
+
     if (newPosition > BOARD_SIZE) {
-      // You must land exactly on the last square, or bounce back (classic rule: bounce back or don't move)
-      // For simplicity, let's just make them not move if they overshoot.
-      newPosition = player.position; 
+      newPosition = player.position;
     } else {
-      // Check snakes and ladders
       newPosition = calculateFinalPosition(newPosition);
     }
-    
+
     player.position = newPosition;
 
-    // Check Win Condition
     if (player.position === BOARD_SIZE) {
       room.status = 'finished';
       room.winner = socket.id;
+      clearTurnTimer(room);
     } else {
-      // If they roll a 6, they often get another turn. But let's skip that complexity for V1 and just advance turn.
       room.turnIndex = (room.turnIndex + 1) % room.playerOrder.length;
+      startTurnTimer(io, roomId); // Restart timer for next player
     }
 
-    // Broadcast new state
     io.to(roomId).emit('update-game', room);
-    
-  }, 1000); // 1 second delay to watch the dice
+  }, 1000);
 }
 
 function handleDisconnect(io, socket) {
-  // Find which room the player was in and remove them
   for (const roomId in rooms) {
     const room = rooms[roomId];
     if (room.players[socket.id]) {
       delete room.players[socket.id];
       room.playerOrder = room.playerOrder.filter(id => id !== socket.id);
-      
+
       if (room.playerOrder.length === 0) {
-        // Delete room if empty
+        clearTurnTimer(room);
         delete rooms[roomId];
       } else {
-        // Adjust turn index if necessary
-        if (room.turnIndex >= room.playerOrder.length) {
-          room.turnIndex = 0;
-        }
-        
-        // If playing and < 2 players left, go back to waiting
+        if (room.turnIndex >= room.playerOrder.length) room.turnIndex = 0;
+
         if (room.status === 'playing' && room.playerOrder.length < 2) {
           room.status = 'waiting';
+          clearTurnTimer(room);
+        } else if (room.status === 'playing') {
+          // Restart timer for whoever's turn it is now
+          startTurnTimer(io, roomId);
         }
-        
+
         io.to(roomId).emit('update-game', room);
       }
       break;
