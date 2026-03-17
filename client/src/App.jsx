@@ -71,11 +71,12 @@ function App() {
     }
   };
 
-  // Function to play "Ghop Ghop" sound (Ladder)
+  // Function to play "Ghop Ghop" sound (Ladder) — trimmed to 2 seconds
   const playLadderSound = () => {
     try {
       const audio = new Audio('/gopgopgop.mp3');
       audio.play();
+      setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 2000);
     } catch(e) {
       console.error("Audio play failed", e);
     }
